@@ -1,38 +1,16 @@
 <?php
-require_once __DIR__.'/admin/lib/db.inc.php';
-require  __DIR__.'/form.php';
+require(__DIR__.'/form.php');
 
-if (!isset($_POST["txn_id"]) && !isset($_POST["txn_type"])) {
+$paypalUrl = 'https://www.sandbox.paypal.com/cgi-bin/webscr';
 
-    $data = [];
-    foreach ($_POST as $key => $value) {
-        $data[$key] = stripslashes($value);
-    }
-
-    // Set the PayPal account.
-    //$data['business'] = $paypalConfig['email'];
-
-    // Set the PayPal return addresses.
-    $data['return'] = stripslashes($paypalConfig['return_url']);
-    $data['cancel_return'] = stripslashes($paypalConfig['cancel_url']);
-    $data['notify_url'] = stripslashes($paypalConfig['notify_url']);
-.
-    $queryString = http_build_query($data);
-
-    // Redirect to paypal IPN
-    header('location:' . $paypalUrl . '?' . $queryString);
-    exit();
-
-} else{ 
-    while(1) 
-    {
+while(1) {
         // Handle the PayPal response.
 
         // Create a connection to the database.
         //$db = new mysqli($dbConfig['host'], $dbConfig['username'], $dbConfig['password'], $dbConfig['name']);
 
         // Assign posted variables to local data array.
-        
+
         $data = [
             'payment_status' => $_POST['payment_status'],
             'payment_amount' => $_POST['mc_gross'],
@@ -45,7 +23,7 @@ if (!isset($_POST["txn_id"]) && !isset($_POST["txn_type"])) {
 
         //check payment
         error_log('payment:'.$data['payment_status']);
-           
+
         if (empty($data['payment_status'])||$data['payment_status']!='Completed')
         {
             error_log("payment is not completed");
@@ -59,7 +37,7 @@ if (!isset($_POST["txn_id"]) && !isset($_POST["txn_type"])) {
         $res=$sql->fetch(PDO::FETCH_ASSOC);
         $digestOld=$res['digest'];
         $salt=$res['salt'];
-        
+
         error_log('get digest '.$digestOld);
         error_log('get salt '.$salt);
 
@@ -110,49 +88,21 @@ if (!isset($_POST["txn_id"]) && !isset($_POST["txn_type"])) {
         $digest=sha1($data["payment_currency"].':'.$data["receiver_email"].':'.$salt.':'.$shoppingcart_info.':'.$totalPrice);
         error_log('newdigest '.$digest);
         error_log('olddigest '.$digestOld);
+
         // We need to verify the transaction comes from PayPal and check we've not
         // already processed the transaction before adding the payment to our
         // database.
         if ( checkTxnid($data['txn_id'])&&verifyTransaction($_POST) ) {
             error_log("both_true");
+
             if (addPayment($data) !== false) {
                     // Payment successfully added into db.
+			break;
                 }
             }else{
                 //Payment failed
+		break;
             }
-    }
 }
 
-    function checkTxnid($txnid) {
-        //TO BE IMPLEMENTED - check whether we've not already processed the transaction before
-        //Sample code from the reference
-
-        /*global $db;
-
-        $txnid = $db->real_escape_string($txnid);
-        $results = $db->query('SELECT * FROM `payments` WHERE txnid = \'' . $txnid . '\'');
-
-        return ! $results->num_rows;*/
-
-        //since it is the demo only
-            $db = ierg4210_DB();
-            $q = $db->prepare("SELECT * FROM orders LIMIT 100;");
-            if ($q->execute()){
-                $cartOrder=$q->fetchAll();
-            }
-            $invoice=$_POST['invoice'];
-            error_log("test invoice: ".$invoice);
-            foreach($cartOrder as $car){
-                if ($car['oid']==$invoice){
-                    if($car['tid']==$_POST['txn_id']){
-                        error_log("Duplicate Traction!!!");
-                        return false;
-                    }
-                }
-            }
-        return true;
-    }
-
-   
 ?>
